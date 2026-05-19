@@ -77,7 +77,11 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(
+    vm: HomeViewModel = hiltViewModel(),
+    triggerAdd: Boolean = false,
+    onAddConsumed: () -> Unit = {}
+) {
     val day by vm.selectedDay.collectAsStateWithLifecycle()
     val tasks by vm.tasks.collectAsStateWithLifecycle()
     val xp by vm.totalXp.collectAsStateWithLifecycle()
@@ -89,6 +93,14 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
     var showCalendar by remember { mutableStateOf(false) }
     var badgeExpanded by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TaskEntity?>(null) }
+
+    LaunchedEffect(triggerAdd) {
+        if (triggerAdd) {
+            if (!isToday) vm.selectDay(today)
+            showAdd = true
+            onAddConsumed()
+        }
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -113,17 +125,16 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
             TopBar(
                 day = day,
                 isToday = isToday,
+                xp = xp,
+                badgeExpanded = badgeExpanded,
+                onBadgeTap = { badgeExpanded = !badgeExpanded },
                 onDateTap = { showCalendar = true },
                 onBackToToday = { vm.selectDay(today) }
             )
 
-            BadgeBlock(
-                xp = xp,
-                expanded = badgeExpanded,
-                onTap = { badgeExpanded = !badgeExpanded }
-            )
+            BadgeDetail(xp = xp, visible = badgeExpanded)
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
             if (tasks.isEmpty()) {
                 EmptyState(isToday = isToday)
@@ -212,29 +223,32 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
 private fun TopBar(
     day: LocalDate,
     isToday: Boolean,
+    xp: Int,
+    badgeExpanded: Boolean,
+    onBadgeTap: () -> Unit,
     onDateTap: () -> Unit,
     onBackToToday: () -> Unit
 ) {
+    val badge = Badge.forXp(xp)
     val dateLabel = day.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = dateLabel,
-            style = MaterialTheme.typography.labelLarge,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .clickable { onDateTap() }
-                .padding(vertical = 4.dp, horizontal = 4.dp)
-        )
-
-        Spacer(Modifier.width(8.dp))
-
-        if (!isToday) {
+        // Left: date or "Today" chip
+        if (isToday) {
+            Text(
+                text = dateLabel,
+                style = MaterialTheme.typography.labelLarge,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clickable { onDateTap() }
+                    .padding(vertical = 4.dp, horizontal = 4.dp)
+            )
+        } else {
             AssistChip(
                 onClick = onBackToToday,
                 label = { Text("Today", fontSize = 12.sp) },
@@ -247,6 +261,20 @@ private fun TopBar(
 
         Spacer(Modifier.weight(1f))
 
+        // Middle: small circular badge
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                .clickable { onBadgeTap() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(badge.emoji, fontSize = 22.sp)
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        // Right: calendar
         IconButton(
             onClick = onDateTap,
             modifier = Modifier.size(32.dp)
@@ -262,69 +290,57 @@ private fun TopBar(
 }
 
 @Composable
-private fun BadgeBlock(xp: Int, expanded: Boolean, onTap: () -> Unit) {
+private fun BadgeDetail(xp: Int, visible: Boolean) {
     val badge = Badge.forXp(xp)
     val next = Badge.nextFor(xp)
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable { onTap() }
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(badge.emoji, fontSize = 44.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            badge.title.uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.sp
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            "$xp XP",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Black
-        )
-
-        AnimatedVisibility(visible = expanded, enter = fadeIn(), exit = fadeOut()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, start = 8.dp, end = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (next != null) {
-                    val span = (next.threshold - badge.threshold).coerceAtLeast(1)
-                    val into = (xp - badge.threshold).coerceIn(0, span)
-                    val progress = into.toFloat() / span.toFloat()
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                        gapSize = 0.dp,
-                        drawStopIndicator = {}
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "${next.threshold - xp} XP to ${next.title} ${next.emoji}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                } else {
-                    Text(
-                        "Top tier reached. Glory is yours.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                badge.title.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp
+            )
+            Text(
+                "$xp XP",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Black
+            )
+            Spacer(Modifier.height(6.dp))
+            if (next != null) {
+                val span = (next.threshold - badge.threshold).coerceAtLeast(1)
+                val into = (xp - badge.threshold).coerceIn(0, span)
+                val progress = into.toFloat() / span.toFloat()
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                    gapSize = 0.dp,
+                    drawStopIndicator = {}
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${next.threshold - xp} XP to ${next.title} ${next.emoji}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            } else {
+                Text(
+                    "Top tier reached. Glory is yours.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

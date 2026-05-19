@@ -46,6 +46,11 @@ class SimpleLifeWidget : GlanceAppWidget() {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
+        val addTaskIntent = Intent(context, MainActivity::class.java).apply {
+            action = "com.thesouravverse.simplelife.OPEN_ADD_TASK"
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_OPEN_ADD, true)
+        }
         val repo = EntryPointAccessors
             .fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
             .taskRepository()
@@ -55,24 +60,33 @@ class SimpleLifeWidget : GlanceAppWidget() {
                 val today = LocalDate.now()
                 val tasks by repo.tasksForDay(today)
                     .collectAsState(initial = emptyList())
-                WidgetBody(tasks, openAppIntent)
+                WidgetBody(tasks, openAppIntent, addTaskIntent)
             }
         }
     }
 
     @Composable
-    private fun WidgetBody(tasks: List<TaskEntity>, openAppIntent: Intent) {
+    private fun WidgetBody(
+        tasks: List<TaskEntity>,
+        openAppIntent: Intent,
+        addTaskIntent: Intent
+    ) {
         val done = tasks.count { it.completed }
         val total = tasks.size
-        Column(
+        Box(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.background)
-                .cornerRadius(20.dp)
-                .padding(12.dp)
-                .clickable(actionStartActivity(openAppIntent))
+                .cornerRadius(20.dp),
+            contentAlignment = Alignment.BottomEnd
         ) {
-            // Header: "Today  X / N"
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+                    .clickable(actionStartActivity(openAppIntent))
+            ) {
+                // Header: "Today  X / N"
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -107,6 +121,26 @@ class SimpleLifeWidget : GlanceAppWidget() {
                         WidgetTaskRow(task)
                     }
                 }
+            }
+            } // close inner Column
+
+            // Quick-add FAB, bottom-right
+            Box(
+                modifier = GlanceModifier
+                    .size(44.dp)
+                    .cornerRadius(22.dp)
+                    .background(GlanceTheme.colors.primary)
+                    .clickable(actionStartActivity(addTaskIntent)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+",
+                    style = TextStyle(
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlanceTheme.colors.onPrimary
+                    )
+                )
             }
         }
     }
