@@ -46,10 +46,9 @@ class SimpleLifeWidget : GlanceAppWidget() {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val addTaskIntent = Intent(context, MainActivity::class.java).apply {
+        val addTaskIntent = Intent(context, com.thesouravverse.simplelife.QuickAddActivity::class.java).apply {
             action = "com.thesouravverse.simplelife.OPEN_ADD_TASK"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(MainActivity.EXTRA_OPEN_ADD, true)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val repo = EntryPointAccessors
             .fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
@@ -124,12 +123,12 @@ class SimpleLifeWidget : GlanceAppWidget() {
             }
             } // close inner Column
 
-            // Quick-add FAB, bottom-right
+            // Quick-add FAB, bottom-right (subtle, blends with widget surface)
             Box(
                 modifier = GlanceModifier
                     .size(44.dp)
                     .cornerRadius(22.dp)
-                    .background(GlanceTheme.colors.primary)
+                    .background(GlanceTheme.colors.surfaceVariant)
                     .clickable(actionStartActivity(addTaskIntent)),
                 contentAlignment = Alignment.Center
             ) {
@@ -138,7 +137,7 @@ class SimpleLifeWidget : GlanceAppWidget() {
                     style = TextStyle(
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.onPrimary
+                        color = GlanceTheme.colors.onSurface
                     )
                 )
             }

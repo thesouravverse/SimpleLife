@@ -25,6 +25,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".QuickAddActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.SimpleLife.Transparent" />
+
         <!-- WorkManager Hilt integration: disable default initializer -->
         <provider
             android:name="androidx.startup.InitializationProvider"
