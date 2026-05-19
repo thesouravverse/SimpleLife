@@ -1,7 +1,11 @@
 package com.thesouravverse.simplelife.data
 
+import android.content.Context
+import androidx.glance.appwidget.updateAll
 import com.thesouravverse.simplelife.data.db.TaskDao
 import com.thesouravverse.simplelife.data.db.TaskEntity
+import com.thesouravverse.simplelife.widget.SimpleLifeWidget
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.LocalDate
@@ -10,7 +14,8 @@ import javax.inject.Singleton
 
 @Singleton
 class TaskRepository @Inject constructor(
-    private val dao: TaskDao
+    private val dao: TaskDao,
+    @ApplicationContext private val context: Context
 ) {
     fun tasksForDay(day: LocalDate): Flow<List<TaskEntity>> =
         dao.tasksForDay(day.toEpochDay())
@@ -24,6 +29,7 @@ class TaskRepository @Inject constructor(
     suspend fun addTask(day: LocalDate, text: String) {
         if (text.isBlank()) return
         dao.insert(TaskEntity(dayEpochDay = day.toEpochDay(), text = text.trim()))
+        refreshWidget()
     }
 
     suspend fun toggleCompleted(task: TaskEntity) {
@@ -32,10 +38,9 @@ class TaskRepository @Inject constructor(
             task.copy(
                 completed = !task.completed,
                 completedAtMillis = now,
-                // If user re-checks a previously-penalized task, keep penalized flag
-                // so total XP stays consistent (-5 stays, +10 added).
             )
         )
+        refreshWidget()
     }
 
     suspend fun toggleById(id: Long) {
@@ -43,9 +48,17 @@ class TaskRepository @Inject constructor(
         toggleCompleted(task)
     }
 
-    suspend fun deleteTask(task: TaskEntity) = dao.deleteById(task.id)
+    suspend fun deleteTask(task: TaskEntity) {
+        dao.deleteById(task.id)
+        refreshWidget()
+    }
 
     suspend fun applyMissedPenalties(today: LocalDate = LocalDate.now()) {
         dao.applyMissedPenalties(today.toEpochDay())
+        refreshWidget()
+    }
+
+    private suspend fun refreshWidget() {
+        runCatching { SimpleLifeWidget().updateAll(context) }
     }
 }

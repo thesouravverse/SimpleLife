@@ -46,20 +46,26 @@ class SimpleLifeWidget : GlanceAppWidget() {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val addTaskIntent = Intent(context, com.thesouravverse.simplelife.QuickAddActivity::class.java).apply {
-            action = "com.thesouravverse.simplelife.OPEN_ADD_TASK"
+        val settingsIntent = Intent(context, WidgetSettingsActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val repo = EntryPointAccessors
             .fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
             .taskRepository()
 
+        val opacity = WidgetSettings.getOpacity(context)
+        val isDark = (context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val baseBg = if (isDark) Color(0xFF14120F) else Color(0xFFFAF6EE)
+        val widgetBg = baseBg.copy(alpha = opacity)
+
         provideContent {
             GlanceTheme {
                 val today = LocalDate.now()
                 val tasks by repo.tasksForDay(today)
                     .collectAsState(initial = emptyList())
-                WidgetBody(tasks, openAppIntent, addTaskIntent)
+                WidgetBody(tasks, openAppIntent, settingsIntent, widgetBg)
             }
         }
     }
@@ -68,16 +74,17 @@ class SimpleLifeWidget : GlanceAppWidget() {
     private fun WidgetBody(
         tasks: List<TaskEntity>,
         openAppIntent: Intent,
-        addTaskIntent: Intent
+        settingsIntent: Intent,
+        bgColor: Color
     ) {
         val done = tasks.count { it.completed }
         val total = tasks.size
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(GlanceTheme.colors.background)
+                .background(bgColor)
                 .cornerRadius(20.dp),
-            contentAlignment = Alignment.BottomEnd
+            contentAlignment = Alignment.TopStart
         ) {
             Column(
                 modifier = GlanceModifier
@@ -85,61 +92,54 @@ class SimpleLifeWidget : GlanceAppWidget() {
                     .padding(12.dp)
                     .clickable(actionStartActivity(openAppIntent))
             ) {
-                // Header: "Today  X / N"
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Today",
-                    style = TextStyle(
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = GlanceTheme.colors.onSurfaceVariant
-                    ),
-                    modifier = GlanceModifier.defaultWeight()
-                )
-                if (total > 0) {
+                // Header: "Today  X / N  ⋯"
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "$done / $total",
+                        text = "Today",
                         style = TextStyle(
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.primary
+                            fontWeight = FontWeight.Medium,
+                            color = GlanceTheme.colors.onSurfaceVariant
+                        ),
+                        modifier = GlanceModifier.defaultWeight()
+                    )
+                    if (total > 0) {
+                        Text(
+                            text = "$done / $total",
+                            style = TextStyle(
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GlanceTheme.colors.primary
+                            ),
+                            modifier = GlanceModifier.padding(end = 8.dp)
                         )
+                    }
+                    // Small, discreet "⋯" — opens widget settings (opacity)
+                    Text(
+                        text = "⋯",
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            color = GlanceTheme.colors.onSurfaceVariant
+                        ),
+                        modifier = GlanceModifier
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .clickable(actionStartActivity(settingsIntent))
                     )
                 }
-            }
-            Spacer(GlanceModifier.height(8.dp))
+                Spacer(GlanceModifier.height(8.dp))
 
-            if (tasks.isEmpty()) {
-                EmptyWidget()
-            } else {
-                LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                    items(items = tasks, itemId = { it.id }) { task ->
-                        WidgetTaskRow(task)
+                if (tasks.isEmpty()) {
+                    EmptyWidget()
+                } else {
+                    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                        items(items = tasks, itemId = { it.id }) { task ->
+                            WidgetTaskRow(task)
+                        }
                     }
                 }
-            }
-            } // close inner Column
-
-            // Quick-add FAB, bottom-right (subtle, blends with widget surface)
-            Box(
-                modifier = GlanceModifier
-                    .size(44.dp)
-                    .cornerRadius(22.dp)
-                    .background(GlanceTheme.colors.surfaceVariant)
-                    .clickable(actionStartActivity(addTaskIntent)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "+",
-                    style = TextStyle(
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.onSurface
-                    )
-                )
             }
         }
     }

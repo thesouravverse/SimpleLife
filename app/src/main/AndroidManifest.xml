@@ -26,8 +26,8 @@
         </activity>
 
         <activity
-            android:name=".QuickAddActivity"
-            android:exported="true"
+            android:name=".widget.WidgetSettingsActivity"
+            android:exported="false"
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@style/Theme.SimpleLife.Transparent" />
