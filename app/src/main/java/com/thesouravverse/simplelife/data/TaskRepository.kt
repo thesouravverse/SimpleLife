@@ -38,6 +38,11 @@ class TaskRepository @Inject constructor(
         )
     }
 
+    suspend fun toggleById(id: Long) {
+        val task = dao.getById(id) ?: return
+        toggleCompleted(task)
+    }
+
     suspend fun deleteTask(task: TaskEntity) = dao.deleteById(task.id)
 
     suspend fun applyMissedPenalties(today: LocalDate = LocalDate.now()) {

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SimpleLife</string>
+    <string name="widget_label">Today’s Tasks</string>
+    <string name="widget_description">See and tick today’s tasks from your home screen.</string>
 </resources>

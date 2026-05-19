@@ -12,6 +12,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE dayEpochDay = :day ORDER BY createdAtMillis ASC")
     fun tasksForDay(day: Long): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun getById(id: Long): TaskEntity?
+
     @Query("SELECT COUNT(*) FROM tasks WHERE completed = 1")
     fun completedCountFlow(): Flow<Int>
 

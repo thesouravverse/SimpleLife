@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,10 +30,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,11 +60,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -84,10 +84,10 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
 
     val today = LocalDate.now()
     val isToday = day == today
-    val isFuture = day.isAfter(today)
 
     var showAdd by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
+    var badgeExpanded by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TaskEntity?>(null) }
 
     Scaffold(
@@ -110,29 +110,30 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
                 .padding(inner)
                 .windowInsetsPadding(WindowInsets.statusBars)
         ) {
-            // Top bar: prev / date+xp+badge / next + calendar
-            DayHeader(
+            TopBar(
                 day = day,
+                isToday = isToday,
+                onDateTap = { showCalendar = true },
+                onBackToToday = { vm.selectDay(today) }
+            )
+
+            BadgeBlock(
                 xp = xp,
-                onPrev = { vm.selectDay(day.minusDays(1)) },
-                onNext = { vm.selectDay(day.plusDays(1)) },
-                canGoNext = !isToday && !isFuture,
-                onCalendar = { showCalendar = true }
+                expanded = badgeExpanded,
+                onTap = { badgeExpanded = !badgeExpanded }
             )
 
             Spacer(Modifier.height(8.dp))
 
             if (tasks.isEmpty()) {
-                EmptyState(isToday = isToday, isFuture = isFuture)
+                EmptyState(isToday = isToday)
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        top = 8.dp, bottom = 96.dp
-                    )
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)
                 ) {
                     items(items = tasks, key = { it.id }) { task ->
                         TaskRow(
@@ -147,7 +148,6 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
         }
     }
 
-    // Add task sheet
     if (showAdd) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
@@ -165,7 +165,6 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
         }
     }
 
-    // Calendar picker
     if (showCalendar) {
         val state = rememberDatePickerState(
             initialSelectedDateMillis = day.atStartOfDay(ZoneId.systemDefault())
@@ -183,7 +182,7 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
                         if (!picked.isAfter(today)) vm.selectDay(picked)
                     }
                     showCalendar = false
-                }) { Text("Jump") }
+                }) { Text("Open") }
             },
             dismissButton = {
                 TextButton(onClick = { showCalendar = false }) { Text("Cancel") }
@@ -191,7 +190,6 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
         ) { DatePicker(state = state) }
     }
 
-    // Delete confirm
     pendingDelete?.let { t ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -211,101 +209,116 @@ fun HomeScreen(vm: HomeViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun DayHeader(
+private fun TopBar(
     day: LocalDate,
-    xp: Int,
-    onPrev: () -> Unit,
-    onNext: () -> Unit,
-    canGoNext: Boolean,
-    onCalendar: () -> Unit
+    isToday: Boolean,
+    onDateTap: () -> Unit,
+    onBackToToday: () -> Unit
 ) {
+    val dateLabel = day.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = dateLabel,
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .clickable { onDateTap() }
+                .padding(vertical = 4.dp, horizontal = 4.dp)
+        )
+
+        Spacer(Modifier.width(8.dp))
+
+        if (!isToday) {
+            AssistChip(
+                onClick = onBackToToday,
+                label = { Text("Today", fontSize = 12.sp) },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        IconButton(
+            onClick = onDateTap,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.CalendarMonth,
+                contentDescription = "Open calendar",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BadgeBlock(xp: Int, expanded: Boolean, onTap: () -> Unit) {
     val badge = Badge.forXp(xp)
     val next = Badge.nextFor(xp)
-    val today = LocalDate.now()
-    val label = when (day) {
-        today -> "TODAY"
-        today.minusDays(1) -> "YESTERDAY"
-        else -> day.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())).uppercase()
-    }
-    val pretty = day.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault()))
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp)
+            .clickable { onTap() }
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Row: < label/date > + calendar
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            NavArrow(Icons.Default.ChevronLeft, "Previous day", onClick = onPrev)
-            Spacer(Modifier.width(4.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    pretty,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-            NavArrow(Icons.Default.ChevronRight, "Next day", onClick = onNext, enabled = canGoNext)
-            IconButton(onClick = onCalendar) {
-                Icon(Icons.Default.CalendarMonth, contentDescription = "Pick date")
-            }
-        }
+        Text(badge.emoji, fontSize = 44.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            badge.title.uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "$xp XP",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Black
+        )
 
-        Spacer(Modifier.height(14.dp))
-
-        // Badge card
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(20.dp)
-                )
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(badge.emoji, fontSize = 36.sp)
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    badge.title.uppercase(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "$xp XP",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Black
-                )
+        AnimatedVisibility(visible = expanded, enter = fadeIn(), exit = fadeOut()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, start = 8.dp, end = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 if (next != null) {
                     val span = (next.threshold - badge.threshold).coerceAtLeast(1)
                     val into = (xp - badge.threshold).coerceIn(0, span)
                     val progress = into.toFloat() / span.toFloat()
-                    Spacer(Modifier.height(6.dp))
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(6.dp),
+                            .height(5.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
                         gapSize = 0.dp,
                         drawStopIndicator = {}
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         "${next.threshold - xp} XP to ${next.title} ${next.emoji}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
                     )
                 } else {
-                    Spacer(Modifier.height(4.dp))
                     Text(
                         "Top tier reached. Glory is yours.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -314,23 +327,6 @@ private fun DayHeader(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NavArrow(
-    icon: ImageVector,
-    desc: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true
-) {
-    IconButton(onClick = onClick, enabled = enabled) {
-        Icon(
-            icon,
-            contentDescription = desc,
-            tint = if (enabled) MaterialTheme.colorScheme.onBackground
-            else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-        )
     }
 }
 
@@ -348,11 +344,6 @@ private fun TaskRow(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(18.dp)
             )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(18.dp)
-            )
             .clickable(enabled = !readOnly) { onToggle() }
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -363,10 +354,8 @@ private fun TaskRow(
             text = task.text,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
-            color = if (task.completed)
-                MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.onBackground,
-            textDecoration = if (task.completed) TextDecoration.LineThrough else null
+            color = MaterialTheme.colorScheme.onBackground
+            // intentionally no strikethrough — user wants to re-read completed tasks
         )
         if (task.completed) {
             Text(
@@ -388,7 +377,8 @@ private fun TaskRow(
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.outline
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -401,7 +391,7 @@ private fun CheckCircle(checked: Boolean) {
     val border = if (checked) DqPalette.Success else MaterialTheme.colorScheme.outline
     Box(
         modifier = Modifier
-            .size(32.dp)
+            .size(30.dp)
             .background(bg, CircleShape)
             .border(2.dp, border, CircleShape),
         contentAlignment = Alignment.Center
@@ -411,7 +401,7 @@ private fun CheckCircle(checked: Boolean) {
                 Icons.Default.Check,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -479,33 +469,18 @@ private fun AddTaskSheet(onAdd: (String) -> Unit, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun EmptyState(isToday: Boolean, isFuture: Boolean) {
+private fun EmptyState(isToday: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                when {
-                    isFuture -> "\uD83D\uDD2E"
-                    isToday -> "\u2728"
-                    else -> "\uD83D\uDCDD"
-                },
-                fontSize = 64.sp
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                when {
-                    isFuture -> "Tomorrow is unwritten."
-                    isToday -> "A blank page.\nTap + to start your day."
-                    else -> "No tasks on this day."
-                },
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
+        Text(
+            if (isToday) "A blank page.\nTap + to start." else "No tasks on this day.",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
