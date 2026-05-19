@@ -1,4 +1,4 @@
-package com.thesouravverse.dayquest.ui
+package com.thesouravverse.simplelife.ui
 
 /**
  * Badge tiers, lowest to highest. The current badge is the highest tier

@@ -1,4 +1,4 @@
-package com.thesouravverse.dayquest
+package com.thesouravverse.simplelife
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.thesouravverse.dayquest.ui.HomeScreen
-import com.thesouravverse.dayquest.ui.theme.DayQuestTheme
+import com.thesouravverse.simplelife.ui.HomeScreen
+import com.thesouravverse.simplelife.ui.theme.SimpleLifeTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            DayQuestTheme {
+            SimpleLifeTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

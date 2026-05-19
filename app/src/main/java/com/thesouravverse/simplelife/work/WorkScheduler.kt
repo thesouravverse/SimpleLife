@@ -1,4 +1,4 @@
-package com.thesouravverse.dayquest.work
+package com.thesouravverse.simplelife.work
 
 import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -36,6 +36,6 @@ class WorkScheduler @Inject constructor(
     }
 
     companion object {
-        private const val UNIQUE_NAME = "dayquest-daily-penalty"
+        private const val UNIQUE_NAME = "SimpleLife-daily-penalty"
     }
 }

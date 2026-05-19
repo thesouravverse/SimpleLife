@@ -7,11 +7,11 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class com.thesouravverse.dayquest.**$$serializer { *; }
--keepclassmembers class com.thesouravverse.dayquest.** {
+-keep,includedescriptorclasses class com.thesouravverse.simplelife.**$$serializer { *; }
+-keepclassmembers class com.thesouravverse.simplelife.** {
     *** Companion;
 }
--keepclasseswithmembers class com.thesouravverse.dayquest.** {
+-keepclasseswithmembers class com.thesouravverse.simplelife.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 

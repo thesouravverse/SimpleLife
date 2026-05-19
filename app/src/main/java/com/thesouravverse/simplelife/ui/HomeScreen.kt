@@ -1,4 +1,4 @@
-package com.thesouravverse.dayquest.ui
+package com.thesouravverse.simplelife.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -68,8 +68,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.thesouravverse.dayquest.data.db.TaskEntity
-import com.thesouravverse.dayquest.ui.theme.DqPalette
+import com.thesouravverse.simplelife.data.db.TaskEntity
+import com.thesouravverse.simplelife.ui.theme.DqPalette
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

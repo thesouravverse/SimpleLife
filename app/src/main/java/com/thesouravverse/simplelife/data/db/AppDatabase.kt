@@ -1,4 +1,4 @@
-package com.thesouravverse.dayquest.data.db
+package com.thesouravverse.simplelife.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase

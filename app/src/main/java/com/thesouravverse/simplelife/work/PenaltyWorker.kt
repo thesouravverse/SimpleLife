@@ -1,10 +1,10 @@
-package com.thesouravverse.dayquest.work
+package com.thesouravverse.simplelife.work
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.thesouravverse.dayquest.data.TaskRepository
+import com.thesouravverse.simplelife.data.TaskRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.time.LocalDate

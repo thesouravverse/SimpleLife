@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.thesouravverse.dayquest"
+    namespace = "com.thesouravverse.simplelife"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.thesouravverse.dayquest"
+        applicationId = "com.thesouravverse.simplelife"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

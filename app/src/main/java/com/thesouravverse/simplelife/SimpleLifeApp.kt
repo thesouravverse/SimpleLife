@@ -1,14 +1,14 @@
-package com.thesouravverse.dayquest
+package com.thesouravverse.simplelife
 
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.thesouravverse.dayquest.work.WorkScheduler
+import com.thesouravverse.simplelife.work.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
 @HiltAndroidApp
-class DayQuestApp : Application(), Configuration.Provider {
+class SimpleLifeApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var workScheduler: WorkScheduler

@@ -1,4 +1,4 @@
-package com.thesouravverse.dayquest.ui.theme
+package com.thesouravverse.simplelife.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -11,7 +11,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// DayQuest palette: warm, kind, kid-friendly.
+// SimpleLife palette: warm, kind, kid-friendly.
 // Cream paper + soft ink, hero indigo, success green, gentle red.
 object DqPalette {
     val Cream = Color(0xFFFAF6EE)
@@ -80,7 +80,7 @@ private val DqTypography = Typography(
 )
 
 @Composable
-fun DayQuestTheme(
+fun SimpleLifeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {

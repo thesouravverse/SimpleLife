@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DayQuest"
+rootProject.name = "SimpleLife"
 include(":app")

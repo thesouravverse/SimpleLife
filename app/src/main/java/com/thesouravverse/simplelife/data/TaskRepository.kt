@@ -1,7 +1,7 @@
-package com.thesouravverse.dayquest.data
+package com.thesouravverse.simplelife.data
 
-import com.thesouravverse.dayquest.data.db.TaskDao
-import com.thesouravverse.dayquest.data.db.TaskEntity
+import com.thesouravverse.simplelife.data.db.TaskDao
+import com.thesouravverse.simplelife.data.db.TaskEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.LocalDate

@@ -1,4 +1,4 @@
-# DayQuest
+# SimpleLife
 
 A minimal life-diary app. Each day is a page. Tap **+**, add a task,
 check it off → green tick + **+10 XP**. Unchecked tasks at end of day → **−5 XP**.

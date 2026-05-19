@@ -1,9 +1,9 @@
-package com.thesouravverse.dayquest.ui
+package com.thesouravverse.simplelife.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.thesouravverse.dayquest.data.TaskRepository
-import com.thesouravverse.dayquest.data.db.TaskEntity
+import com.thesouravverse.simplelife.data.TaskRepository
+import com.thesouravverse.simplelife.data.db.TaskEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
