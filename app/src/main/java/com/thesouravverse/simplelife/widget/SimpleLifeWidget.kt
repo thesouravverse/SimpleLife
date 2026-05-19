@@ -1,6 +1,7 @@
 package com.thesouravverse.simplelife.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,6 +43,9 @@ import java.time.LocalDate
 class SimpleLifeWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
         val repo = EntryPointAccessors
             .fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
             .taskRepository()
@@ -51,13 +55,13 @@ class SimpleLifeWidget : GlanceAppWidget() {
                 val today = LocalDate.now()
                 val tasks by repo.tasksForDay(today)
                     .collectAsState(initial = emptyList())
-                WidgetBody(tasks)
+                WidgetBody(tasks, openAppIntent)
             }
         }
     }
 
     @Composable
-    private fun WidgetBody(tasks: List<TaskEntity>) {
+    private fun WidgetBody(tasks: List<TaskEntity>, openAppIntent: Intent) {
         val done = tasks.count { it.completed }
         val total = tasks.size
         Column(
@@ -66,7 +70,7 @@ class SimpleLifeWidget : GlanceAppWidget() {
                 .background(GlanceTheme.colors.background)
                 .cornerRadius(20.dp)
                 .padding(12.dp)
-                .clickable(actionStartActivity<MainActivity>())
+                .clickable(actionStartActivity(openAppIntent))
         ) {
             // Header: "Today  X / N"
             Row(
