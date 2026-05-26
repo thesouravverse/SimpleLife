@@ -65,22 +65,47 @@ class SimpleLifeWidget : GlanceAppWidget() {
                 val today = LocalDate.now()
                 val allToday by repo.tasksForDay(today)
                     .collectAsState(initial = emptyList())
-                // Widget shows only top-level tasks; subtasks are rolled into parent state.
-                val tasks = allToday.filter { it.parentId == null }
-                WidgetBody(tasks, openAppIntent, settingsIntent, widgetBg)
+                WidgetBody(allToday, openAppIntent, settingsIntent, widgetBg)
             }
         }
     }
 
+    private data class WidgetRow(
+        val task: TaskEntity,
+        val isSub: Boolean,
+        val xpLabel: String?
+    )
+
     @Composable
     private fun WidgetBody(
-        tasks: List<TaskEntity>,
+        allTasks: List<TaskEntity>,
         openAppIntent: Intent,
         settingsIntent: Intent,
         bgColor: Color
     ) {
-        val done = tasks.count { it.completed }
-        val total = tasks.size
+        val parents = allTasks.filter { it.parentId == null }
+        val subsByParent = allTasks.filter { it.parentId != null }.groupBy { it.parentId!! }
+        val done = parents.count { it.completed }
+        val total = parents.size
+
+        // Build flat display list: each parent, then its subs indented.
+        val rows = buildList {
+            for (p in parents) {
+                val subs = subsByParent[p.id].orEmpty()
+                val parentXp = when {
+                    subs.isEmpty() && p.completed -> "+10"
+                    p.penaltyCount > 0 -> "-${p.penaltyCount * 5}"
+                    else -> null
+                }
+                add(WidgetRow(p, isSub = false, xpLabel = parentXp))
+                if (subs.isNotEmpty()) {
+                    val xpPer = 10 / subs.size.coerceAtLeast(1)
+                    for (s in subs) {
+                        add(WidgetRow(s, isSub = true, xpLabel = if (s.completed) "+$xpPer" else null))
+                    }
+                }
+            }
+        }
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -133,12 +158,12 @@ class SimpleLifeWidget : GlanceAppWidget() {
                 }
                 Spacer(GlanceModifier.height(8.dp))
 
-                if (tasks.isEmpty()) {
+                if (rows.isEmpty()) {
                     EmptyWidget()
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                        items(items = tasks, itemId = { it.id }) { task ->
-                            WidgetTaskRow(task)
+                        items(items = rows, itemId = { (it.task.id * 2L) + if (it.isSub) 1L else 0L }) { row ->
+                            WidgetTaskRow(row)
                         }
                     }
                 }
@@ -147,11 +172,16 @@ class SimpleLifeWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun WidgetTaskRow(task: TaskEntity) {
+    private fun WidgetTaskRow(row: WidgetRow) {
+        val task = row.task
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp)
+                .padding(
+                    start = if (row.isSub) 22.dp else 0.dp,
+                    top = if (row.isSub) 3.dp else 6.dp,
+                    bottom = if (row.isSub) 3.dp else 6.dp
+                )
                 .clickable(
                     actionRunCallback<ToggleTaskAction>(
                         parameters = ToggleTaskAction.params(task.id)
@@ -159,20 +189,19 @@ class SimpleLifeWidget : GlanceAppWidget() {
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Checkbox circle
+            val dotSize = if (row.isSub) 16.dp else 20.dp
             val checkColor = if (task.completed) Color(0xFF2BB673) else Color(0x66888888)
             Box(
                 modifier = GlanceModifier
-                    .size(20.dp)
-                    .cornerRadius(10.dp)
-                    .background(if (task.completed) Color(0xFF2BB673) else Color.Transparent)
-                    .padding(0.dp),
+                    .size(dotSize)
+                    .cornerRadius(dotSize / 2)
+                    .background(if (task.completed) Color(0xFF2BB673) else Color.Transparent),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (task.completed) "✓" else "○",
                     style = TextStyle(
-                        fontSize = 14.sp,
+                        fontSize = if (row.isSub) 11.sp else 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = ColorProvider(
                             if (task.completed) Color.White else checkColor
@@ -184,20 +213,21 @@ class SimpleLifeWidget : GlanceAppWidget() {
             Text(
                 text = task.text,
                 style = TextStyle(
-                    fontSize = 14.sp,
-                    fontWeight = if (task.completed) FontWeight.Normal else FontWeight.Medium,
-                    color = GlanceTheme.colors.onSurface
+                    fontSize = if (row.isSub) 12.sp else 14.sp,
+                    fontWeight = if (task.completed || row.isSub) FontWeight.Normal else FontWeight.Medium,
+                    color = if (row.isSub) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface
                 ),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight()
             )
-            if (task.completed) {
+            row.xpLabel?.let { label ->
+                val color = if (label.startsWith("-")) Color(0xFFE07A5F) else Color(0xFF2BB673)
                 Text(
-                    text = "+10",
+                    text = label,
                     style = TextStyle(
-                        fontSize = 12.sp,
+                        fontSize = if (row.isSub) 11.sp else 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ColorProvider(Color(0xFF2BB673))
+                        color = ColorProvider(color)
                     )
                 )
             }
