@@ -63,8 +63,10 @@ class SimpleLifeWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 val today = LocalDate.now()
-                val tasks by repo.tasksForDay(today)
+                val allToday by repo.tasksForDay(today)
                     .collectAsState(initial = emptyList())
+                // Widget shows only top-level tasks; subtasks are rolled into parent state.
+                val tasks = allToday.filter { it.parentId == null }
                 WidgetBody(tasks, openAppIntent, settingsIntent, widgetBg)
             }
         }

@@ -24,6 +24,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -94,6 +98,11 @@ fun HomeScreen(
     var showCalendar by remember { mutableStateOf(false) }
     var badgeExpanded by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TaskEntity?>(null) }
+    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
+    val addingSubFor = remember { mutableStateMapOf<Long, Boolean>() }
+
+    val parents = tasks.filter { it.parentId == null }
+    val subsByParent = tasks.filter { it.parentId != null }.groupBy { it.parentId!! }
 
     LaunchedEffect(triggerAdd) {
         if (triggerAdd) {
@@ -133,6 +142,7 @@ fun HomeScreen(
                 day = day,
                 isToday = isToday,
                 xp = xp,
+                taskCount = parents.size,
                 badgeExpanded = badgeExpanded,
                 onBadgeTap = { badgeExpanded = !badgeExpanded },
                 onDateTap = { showCalendar = true },
@@ -143,7 +153,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            if (tasks.isEmpty()) {
+            if (parents.isEmpty()) {
                 EmptyState(isToday = isToday)
             } else {
                 LazyColumn(
@@ -153,12 +163,32 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)
                 ) {
-                    items(items = tasks, key = { it.id }) { task ->
-                        TaskRow(
-                            task = task,
+                    items(items = parents, key = { it.id }) { parent ->
+                        val subs = subsByParent[parent.id].orEmpty()
+                        val isExpanded = expanded[parent.id] == true
+                        val isAddingSub = addingSubFor[parent.id] == true
+                        ParentTaskCard(
+                            parent = parent,
+                            subs = subs,
                             readOnly = !isToday,
-                            onToggle = { vm.toggleTask(task) },
-                            onDelete = { pendingDelete = task }
+                            expanded = isExpanded || isAddingSub,
+                            adding = isAddingSub,
+                            onToggle = { vm.toggleTask(parent) },
+                            onToggleSub = { sub -> vm.toggleTask(sub) },
+                            onDelete = { pendingDelete = parent },
+                            onDeleteSub = { sub -> pendingDelete = sub },
+                            onToggleExpand = {
+                                expanded[parent.id] = !(expanded[parent.id] ?: false)
+                            },
+                            onStartAddSub = {
+                                addingSubFor[parent.id] = true
+                                expanded[parent.id] = true
+                            },
+                            onCancelAddSub = { addingSubFor[parent.id] = false },
+                            onAddSub = { text ->
+                                vm.addSubtask(parent, text)
+                                addingSubFor[parent.id] = false
+                            }
                         )
                     }
                 }
@@ -231,6 +261,7 @@ private fun TopBar(
     day: LocalDate,
     isToday: Boolean,
     xp: Int,
+    taskCount: Int,
     badgeExpanded: Boolean,
     onBadgeTap: () -> Unit,
     onDateTap: () -> Unit,
@@ -281,7 +312,16 @@ private fun TopBar(
 
         Spacer(Modifier.weight(1f))
 
-        // Right: calendar
+        // Right: task count + calendar
+        if (taskCount > 0) {
+            Text(
+                text = taskCount.toString(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 6.dp)
+            )
+        }
         IconButton(
             onClick = onDateTap,
             modifier = Modifier.size(32.dp)
@@ -354,8 +394,142 @@ private fun BadgeDetail(xp: Int, visible: Boolean) {
 }
 
 @Composable
-private fun TaskRow(
-    task: TaskEntity,
+private fun ParentTaskCard(
+    parent: TaskEntity,
+    subs: List<TaskEntity>,
+    readOnly: Boolean,
+    expanded: Boolean,
+    adding: Boolean,
+    onToggle: () -> Unit,
+    onToggleSub: (TaskEntity) -> Unit,
+    onDelete: () -> Unit,
+    onDeleteSub: (TaskEntity) -> Unit,
+    onToggleExpand: () -> Unit,
+    onStartAddSub: () -> Unit,
+    onCancelAddSub: () -> Unit,
+    onAddSub: (String) -> Unit
+) {
+    val hasSubs = subs.isNotEmpty()
+    val doneSubs = subs.count { it.completed }
+    val xpPer = if (hasSubs) 10 / subs.size.coerceAtLeast(1) else 10
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(18.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        // Parent row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !readOnly) { onToggle() }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CheckCircle(checked = parent.completed)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = parent.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (hasSubs) {
+                    Text(
+                        text = "$doneSubs / ${subs.size} sub-tasks",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+            if (parent.completed) {
+                Text(
+                    "+10",
+                    color = DqPalette.Success,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            } else if (parent.penaltyCount > 0) {
+                Text(
+                    "-${parent.penaltyCount * 5}",
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            if (!readOnly) {
+                // Expand / collapse only if there's something to show or add
+                if (hasSubs) {
+                    IconButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "Toggle sub-tasks",
+                            tint = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = onStartAddSub,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SubdirectoryArrowRight,
+                        contentDescription = "Add sub-task",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        // Sub-tasks
+        AnimatedVisibility(visible = expanded && (hasSubs || adding)) {
+            Column(modifier = Modifier.padding(start = 32.dp, top = 6.dp)) {
+                subs.forEach { sub ->
+                    SubTaskRow(
+                        sub = sub,
+                        xpPer = xpPer,
+                        readOnly = readOnly,
+                        onToggle = { onToggleSub(sub) },
+                        onDelete = { onDeleteSub(sub) }
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+                if (adding) {
+                    AddSubtaskInline(
+                        onAdd = onAddSub,
+                        onCancel = onCancelAddSub
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubTaskRow(
+    sub: TaskEntity,
+    xpPer: Int,
     readOnly: Boolean,
     onToggle: () -> Unit,
     onDelete: () -> Unit
@@ -363,47 +537,93 @@ private fun TaskRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(18.dp)
-            )
             .clickable(enabled = !readOnly) { onToggle() }
-            .padding(horizontal = 14.dp, vertical = 14.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CheckCircle(checked = task.completed)
-        Spacer(Modifier.width(14.dp))
+        SmallCheckCircle(checked = sub.completed)
+        Spacer(Modifier.width(10.dp))
         Text(
-            text = task.text,
+            text = sub.text,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground
-            // intentionally no strikethrough — user wants to re-read completed tasks
         )
-        if (task.completed) {
+        if (sub.completed) {
             Text(
-                "+10",
+                "+$xpPer",
                 color = DqPalette.Success,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        } else if (task.penalized) {
-            Text(
-                "-5",
-                color = MaterialTheme.colorScheme.error,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp)
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 6.dp)
             )
         }
         if (!readOnly) {
-            IconButton(onClick = onDelete, modifier = Modifier.padding(start = 4.dp)) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Delete",
                     tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(14.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SmallCheckCircle(checked: Boolean) {
+    val bg = if (checked) DqPalette.Success else Color.Transparent
+    val border = if (checked) DqPalette.Success else MaterialTheme.colorScheme.outline
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .background(bg, CircleShape)
+            .border(2.dp, border, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedVisibility(visible = checked, enter = fadeIn(), exit = fadeOut()) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddSubtaskInline(onAdd: (String) -> Unit, onCancel: () -> Unit) {
+    var text by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    val kb = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focus),
+            placeholder = { Text("Sub-task", fontSize = 12.sp) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+        )
+        Spacer(Modifier.width(6.dp))
+        TextButton(onClick = {
+            if (text.isNotBlank()) {
+                kb?.hide()
+                onAdd(text)
+            } else onCancel()
+        }) {
+            Text(if (text.isBlank()) "Cancel" else "Add", fontSize = 12.sp)
         }
     }
 }

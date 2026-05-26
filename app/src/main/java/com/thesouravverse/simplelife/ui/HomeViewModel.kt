@@ -45,6 +45,10 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { repo.addTask(_selectedDay.value, text) }
     }
 
+    fun addSubtask(parent: TaskEntity, text: String) {
+        viewModelScope.launch { repo.addSubtask(parent, text) }
+    }
+
     fun toggleTask(task: TaskEntity) {
         viewModelScope.launch { repo.toggleCompleted(task) }
     }

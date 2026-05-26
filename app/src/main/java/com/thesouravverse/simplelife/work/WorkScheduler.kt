@@ -19,7 +19,9 @@ class WorkScheduler @Inject constructor(
 ) {
     fun scheduleDailyPenalty() {
         val now = LocalDateTime.now()
-        val nextRun = LocalDateTime.of(LocalDate.now(), LocalTime.of(23, 59))
+        // Run shortly after midnight so we roll over yesterday's incompletes
+        // and the home-screen widget refreshes for the new day.
+        val nextRun = LocalDateTime.of(LocalDate.now(), LocalTime.of(0, 5))
             .let { if (it.isBefore(now)) it.plusDays(1) else it }
         val initialDelay = Duration.between(now, nextRun).toMillis()
             .coerceAtLeast(0L)

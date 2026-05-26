@@ -3,23 +3,26 @@ package com.thesouravverse.simplelife.data.db
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
 
+    /** All tasks for a given day — both top-level and sub-tasks. */
     @Query("SELECT * FROM tasks WHERE dayEpochDay = :day ORDER BY createdAtMillis ASC")
     fun tasksForDay(day: Long): Flow<List<TaskEntity>>
+
+    /** Stream of every task in the database — used to compute global XP. */
+    @Query("SELECT * FROM tasks")
+    fun allTasksFlow(): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getById(id: Long): TaskEntity?
 
-    @Query("SELECT COUNT(*) FROM tasks WHERE completed = 1")
-    fun completedCountFlow(): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM tasks WHERE penalized = 1")
-    fun penalizedCountFlow(): Flow<Int>
+    @Query("SELECT * FROM tasks WHERE parentId = :parentId")
+    suspend fun subtasksOf(parentId: Long): List<TaskEntity>
 
     @Insert
     suspend fun insert(task: TaskEntity): Long
@@ -30,16 +33,34 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    /**
-     * Mark all unchecked tasks from days strictly before [today] as penalized,
-     * if they haven't already been. Idempotent.
-     */
+    @Query("DELETE FROM tasks WHERE parentId = :parentId")
+    suspend fun deleteSubtasksOf(parentId: Long)
+
+    /** Mark every parent that's still incomplete and lives on a past day as
+     *  rolled over: bump its penaltyCount and pull it to today. */
     @Query("""
         UPDATE tasks
-        SET penalized = 1
+        SET penaltyCount = penaltyCount + 1,
+            dayEpochDay = :today
         WHERE completed = 0
-          AND penalized = 0
+          AND parentId IS NULL
           AND dayEpochDay < :today
     """)
-    suspend fun applyMissedPenalties(today: Long)
+    suspend fun rolloverParents(today: Long)
+
+    /** Keep every sub-task's day in sync with its parent. Cheap; run after parent moves. */
+    @Query("""
+        UPDATE tasks
+        SET dayEpochDay = (
+            SELECT p.dayEpochDay FROM tasks p WHERE p.id = tasks.parentId
+        )
+        WHERE parentId IS NOT NULL
+    """)
+    suspend fun syncSubtaskDays()
+
+    @Transaction
+    suspend fun rolloverIncomplete(today: Long) {
+        rolloverParents(today)
+        syncSubtaskDays()
+    }
 }
