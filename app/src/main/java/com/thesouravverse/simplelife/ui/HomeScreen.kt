@@ -93,6 +93,8 @@ fun HomeScreen(
 
     val today = LocalDate.now()
     val isToday = day == today
+    val isPast = day.isBefore(today)
+    val isFuture = day.isAfter(today)
 
     var showAdd by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
@@ -114,7 +116,7 @@ fun HomeScreen(
 
     Scaffold(
         floatingActionButton = {
-            if (isToday) {
+            if (!isPast) {
                 FloatingActionButton(
                     onClick = { showAdd = true },
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -140,7 +142,7 @@ fun HomeScreen(
         ) {
             TopBar(
                 day = day,
-                isToday = isToday,
+                today = today,
                 xp = xp,
                 taskCount = parents.size,
                 badgeExpanded = badgeExpanded,
@@ -154,7 +156,7 @@ fun HomeScreen(
             Spacer(Modifier.height(4.dp))
 
             if (parents.isEmpty()) {
-                EmptyState(isToday = isToday)
+                EmptyState(day = day, today = today)
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -170,7 +172,7 @@ fun HomeScreen(
                         ParentTaskCard(
                             parent = parent,
                             subs = subs,
-                            readOnly = !isToday,
+                            readOnly = isPast,
                             expanded = isExpanded || isAddingSub,
                             adding = isAddingSub,
                             onToggle = { vm.toggleTask(parent) },
@@ -217,7 +219,7 @@ fun HomeScreen(
         val state = rememberDatePickerState(
             initialSelectedDateMillis = day.atStartOfDay(ZoneId.systemDefault())
                 .toInstant().toEpochMilli(),
-            yearRange = (today.year - 5)..today.year
+            yearRange = (today.year - 1)..(today.year + 5)
         )
         DatePickerDialog(
             onDismissRequest = { showCalendar = false },
@@ -227,7 +229,7 @@ fun HomeScreen(
                         val picked = java.time.Instant.ofEpochMilli(millis)
                             .atZone(ZoneId.systemDefault())
                             .toLocalDate()
-                        if (!picked.isAfter(today)) vm.selectDay(picked)
+                        vm.selectDay(picked)
                     }
                     showCalendar = false
                 }) { Text("Open") }
@@ -259,7 +261,7 @@ fun HomeScreen(
 @Composable
 private fun TopBar(
     day: LocalDate,
-    isToday: Boolean,
+    today: LocalDate,
     xp: Int,
     taskCount: Int,
     badgeExpanded: Boolean,
@@ -268,14 +270,17 @@ private fun TopBar(
     onBackToToday: () -> Unit
 ) {
     val badge = Badge.forXp(xp)
+    val isToday = day == today
+    val isFuture = day.isAfter(today)
     val dateLabel = day.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+    val plannedLabel = day.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()))
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: date or "Today" chip
+        // Left: date or planning chip
         if (isToday) {
             Text(
                 text = dateLabel,
@@ -289,7 +294,12 @@ private fun TopBar(
         } else {
             AssistChip(
                 onClick = onBackToToday,
-                label = { Text("Today", fontSize = 12.sp) },
+                label = {
+                    Text(
+                        text = (if (isFuture) "Planning " else "") + plannedLabel + "  ·  Today",
+                        fontSize = 12.sp
+                    )
+                },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     labelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -712,7 +722,12 @@ private fun AddTaskSheet(onAdd: (String) -> Unit, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun EmptyState(isToday: Boolean) {
+private fun EmptyState(day: LocalDate, today: LocalDate) {
+    val label = when {
+        day == today -> "A blank page.\nTap + to start."
+        day.isAfter(today) -> "Plan ahead.\nTap + to schedule a task for this day."
+        else -> "No tasks on this day."
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -720,7 +735,7 @@ private fun EmptyState(isToday: Boolean) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            if (isToday) "A blank page.\nTap + to start." else "No tasks on this day.",
+            label,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
