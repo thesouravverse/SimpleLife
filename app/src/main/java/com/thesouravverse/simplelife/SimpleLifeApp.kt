@@ -21,5 +21,7 @@ class SimpleLifeApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         workScheduler.scheduleDailyPenalty()
+        workScheduler.scheduleSync()
+        workScheduler.syncNow()
     }
 }

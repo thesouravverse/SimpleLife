@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.thesouravverse.simplelife.data.TaskRepository
 import com.thesouravverse.simplelife.data.db.TaskEntity
+import com.thesouravverse.simplelife.sync.SyncSettings
+import com.thesouravverse.simplelife.work.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +20,9 @@ import javax.inject.Inject
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repo: TaskRepository
+    private val repo: TaskRepository,
+    private val syncSettings: SyncSettings,
+    private val workScheduler: WorkScheduler
 ) : ViewModel() {
 
     private val _selectedDay = MutableStateFlow(LocalDate.now())
@@ -30,6 +34,15 @@ class HomeViewModel @Inject constructor(
 
     val totalXp: StateFlow<Int> = repo.totalXpFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val token: StateFlow<String> = syncSettings.tokenFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+    val repoName: StateFlow<String> = syncSettings.repoFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+    val lastResult: StateFlow<String> = syncSettings.lastResultFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     init {
         // Apply -5 penalty for any past unchecked tasks every time the app opens.
@@ -55,5 +68,16 @@ class HomeViewModel @Inject constructor(
 
     fun deleteTask(task: TaskEntity) {
         viewModelScope.launch { repo.deleteTask(task) }
+    }
+
+    fun saveSyncSettings(token: String, repo: String) {
+        viewModelScope.launch {
+            syncSettings.save(token, repo)
+            workScheduler.syncNow()
+        }
+    }
+
+    fun syncNow() {
+        workScheduler.syncNow()
     }
 }

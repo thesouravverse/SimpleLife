@@ -1,7 +1,11 @@
 package com.thesouravverse.simplelife.work
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -37,7 +41,35 @@ class WorkScheduler @Inject constructor(
         )
     }
 
+    private val networkConstraints = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .build()
+
+    fun scheduleSync() {
+        val request = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
+            .setConstraints(networkConstraints)
+            .build()
+        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
+            SYNC_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
+    fun syncNow() {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(networkConstraints)
+            .build()
+        WorkManager.getInstance(ctx).enqueueUniqueWork(
+            SYNC_NOW_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
     companion object {
         private const val UNIQUE_NAME = "SimpleLife-daily-penalty"
+        private const val SYNC_NAME = "SimpleLife-sync"
+        private const val SYNC_NOW_NAME = "SimpleLife-sync-now"
     }
 }

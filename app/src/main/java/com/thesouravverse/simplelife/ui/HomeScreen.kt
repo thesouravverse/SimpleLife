@@ -35,6 +35,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -68,6 +71,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -98,6 +103,7 @@ fun HomeScreen(
 
     var showAdd by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
+    var showSyncSettings by remember { mutableStateOf(false) }
     var badgeExpanded by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TaskEntity?>(null) }
     val expanded = remember { mutableStateMapOf<Long, Boolean>() }
@@ -148,6 +154,7 @@ fun HomeScreen(
                 badgeExpanded = badgeExpanded,
                 onBadgeTap = { badgeExpanded = !badgeExpanded },
                 onDateTap = { showCalendar = true },
+                onSettingsTap = { showSyncSettings = true },
                 onBackToToday = { vm.selectDay(today) }
             )
 
@@ -240,6 +247,23 @@ fun HomeScreen(
         ) { DatePicker(state = state) }
     }
 
+    if (showSyncSettings) {
+        val savedToken by vm.token.collectAsStateWithLifecycle()
+        val savedRepo by vm.repoName.collectAsStateWithLifecycle()
+        val lastResult by vm.lastResult.collectAsStateWithLifecycle()
+        SyncSettingsDialog(
+            initialToken = savedToken,
+            initialRepo = savedRepo,
+            lastResult = lastResult,
+            onDismiss = { showSyncSettings = false },
+            onSyncNow = { vm.syncNow() },
+            onSave = { token, repo ->
+                vm.saveSyncSettings(token, repo)
+                showSyncSettings = false
+            }
+        )
+    }
+
     pendingDelete?.let { t ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -267,6 +291,7 @@ private fun TopBar(
     badgeExpanded: Boolean,
     onBadgeTap: () -> Unit,
     onDateTap: () -> Unit,
+    onSettingsTap: () -> Unit,
     onBackToToday: () -> Unit
 ) {
     val badge = Badge.forXp(xp)
@@ -339,6 +364,17 @@ private fun TopBar(
             Icon(
                 Icons.Default.CalendarMonth,
                 contentDescription = "Open calendar",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        IconButton(
+            onClick = onSettingsTap,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.Settings,
+                contentDescription = "Sync settings",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
@@ -719,6 +755,76 @@ private fun AddTaskSheet(onAdd: (String) -> Unit, onCancel: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
     }
+}
+
+@Composable
+private fun SyncSettingsDialog(
+    initialToken: String,
+    initialRepo: String,
+    lastResult: String,
+    onDismiss: () -> Unit,
+    onSyncNow: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var token by remember(initialToken) { mutableStateOf(initialToken) }
+    var repo by remember(initialRepo) { mutableStateOf(initialRepo) }
+    var reveal by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Task sync") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    label = { Text("GitHub token") },
+                    placeholder = { Text("github_pat_\u2026") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    visualTransformation =
+                        if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { reveal = !reveal }) {
+                            Icon(
+                                if (reveal) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (reveal) "Hide token" else "Show token",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = repo,
+                    onValueChange = { repo = it },
+                    label = { Text("Sync repo") },
+                    placeholder = { Text("owner/simplelife-sync") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (lastResult.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        lastResult,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(token, repo) }) { Text("Save") }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onSyncNow) { Text("Sync now") }
+            }
+        }
+    )
 }
 
 @Composable

@@ -48,6 +48,16 @@ class TaskRepository @Inject constructor(
         refreshWidget()
     }
 
+    /** Insert a task and its sub-tasks from a sync payload. Returns parent id. */
+    suspend fun addTaskFromSync(day: LocalDate, text: String, subtasks: List<String>): Long {
+        val parentId = dao.insert(TaskEntity(dayEpochDay = day.toEpochDay(), text = text.trim()))
+        subtasks.filter { it.isNotBlank() }.forEach { s ->
+            dao.insert(TaskEntity(dayEpochDay = day.toEpochDay(), text = s.trim(), parentId = parentId))
+        }
+        refreshWidget()
+        return parentId
+    }
+
     suspend fun addSubtask(parent: TaskEntity, text: String) {
         if (text.isBlank()) return
         dao.insert(
