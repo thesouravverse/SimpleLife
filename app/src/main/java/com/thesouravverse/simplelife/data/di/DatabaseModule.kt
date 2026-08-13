@@ -37,6 +37,7 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
         Room.databaseBuilder(ctx, AppDatabase::class.java, "SimpleLife.db")
             .addMigrations(MIGRATION_2_3)
+            .fallbackToDestructiveMigration()
             .build()
 
     @Provides

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.thesouravverse.simplelife.data.TaskRepository
 import com.thesouravverse.simplelife.data.db.TaskEntity
+import com.thesouravverse.simplelife.sync.SyncRepository
 import com.thesouravverse.simplelife.sync.SyncSettings
 import com.thesouravverse.simplelife.work.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,12 +16,15 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repo: TaskRepository,
+    private val syncRepo: SyncRepository,
     private val syncSettings: SyncSettings,
     private val workScheduler: WorkScheduler
 ) : ViewModel() {
@@ -79,5 +83,18 @@ class HomeViewModel @Inject constructor(
 
     fun syncNow() {
         workScheduler.syncNow()
+    }
+
+    /** Import tasks from a raw inbox.json string picked from device storage. */
+    fun importJson(text: String) {
+        viewModelScope.launch {
+            val n = syncRepo.importInbox(text)
+            val time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
+            val msg = when {
+                n < 0 -> "Import failed \u00b7 not valid JSON \u00b7 $time"
+                else -> "Loaded $n new task${if (n == 1) "" else "s"} from file \u00b7 $time"
+            }
+            syncSettings.setLastResult(msg)
+        }
     }
 }

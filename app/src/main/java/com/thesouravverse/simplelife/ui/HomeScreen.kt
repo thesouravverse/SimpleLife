@@ -1,5 +1,7 @@
 package com.thesouravverse.simplelife.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -68,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -251,12 +254,25 @@ fun HomeScreen(
         val savedToken by vm.token.collectAsStateWithLifecycle()
         val savedRepo by vm.repoName.collectAsStateWithLifecycle()
         val lastResult by vm.lastResult.collectAsStateWithLifecycle()
+        val context = LocalContext.current
+        val jsonPicker = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            uri?.let {
+                val text = runCatching {
+                    context.contentResolver.openInputStream(it)
+                        ?.bufferedReader()?.use { r -> r.readText() }
+                }.getOrNull()
+                if (text != null) vm.importJson(text)
+            }
+        }
         SyncSettingsDialog(
             initialToken = savedToken,
             initialRepo = savedRepo,
             lastResult = lastResult,
             onDismiss = { showSyncSettings = false },
             onSyncNow = { vm.syncNow() },
+            onLoadJson = { jsonPicker.launch(arrayOf("application/json", "text/*", "*/*")) },
             onSave = { token, repo ->
                 vm.saveSyncSettings(token, repo)
                 showSyncSettings = false
@@ -764,6 +780,7 @@ private fun SyncSettingsDialog(
     lastResult: String,
     onDismiss: () -> Unit,
     onSyncNow: () -> Unit,
+    onLoadJson: () -> Unit,
     onSave: (String, String) -> Unit
 ) {
     var token by remember(initialToken) { mutableStateOf(initialToken) }
@@ -805,6 +822,19 @@ private fun SyncSettingsDialog(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(12.dp))
+                TextButton(
+                    onClick = onLoadJson,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Load a .json file")
+                }
                 if (lastResult.isNotBlank()) {
                     Spacer(Modifier.height(10.dp))
                     Text(

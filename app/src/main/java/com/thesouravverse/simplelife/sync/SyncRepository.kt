@@ -24,8 +24,16 @@ class SyncRepository @Inject constructor(
     suspend fun pullInbox(): Int {
         if (!settings.isConfigured()) return 0
         val file = client.get(GitHubContentsClient.INBOX_PATH) ?: return 0
-        val inbox = runCatching { SyncJson.decodeFromString<Inbox>(file.text) }
-            .getOrElse { return 0 }
+        return importInbox(file.text).coerceAtLeast(0)
+    }
+
+    /**
+     * Import tasks from a raw inbox.json string (local file or remote).
+     * Returns the number inserted, or -1 when the JSON can't be parsed.
+     */
+    suspend fun importInbox(text: String): Int {
+        val inbox = runCatching { SyncJson.decodeFromString<Inbox>(text) }
+            .getOrElse { return -1 }
 
         var inserted = 0
         for (item in inbox.tasks) {
