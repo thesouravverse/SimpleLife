@@ -2,29 +2,32 @@ package com.thesouravverse.simplelife.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.thesouravverse.simplelife.data.TaskRepository
 import com.thesouravverse.simplelife.data.db.TaskEntity
-import com.thesouravverse.simplelife.sync.SyncRepository
 import com.thesouravverse.simplelife.sync.SyncSettings
+import com.thesouravverse.simplelife.sync.TaskImporter
 import com.thesouravverse.simplelife.work.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repo: TaskRepository,
-    private val syncRepo: SyncRepository,
+    private val importer: TaskImporter,
     private val syncSettings: SyncSettings,
     private val workScheduler: WorkScheduler
 ) : ViewModel() {
@@ -47,6 +50,10 @@ class HomeViewModel @Inject constructor(
 
     val lastResult: StateFlow<String> = syncSettings.lastResultFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+    /** One-shot messages for the home-screen Snackbar. */
+    private val _snackbar = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val snackbar: SharedFlow<String> = _snackbar
 
     init {
         // Apply -5 penalty for any past unchecked tasks every time the app opens.
@@ -85,16 +92,19 @@ class HomeViewModel @Inject constructor(
         workScheduler.syncNow()
     }
 
-    /** Import tasks from a raw inbox.json string picked from device storage. */
-    fun importJson(text: String) {
+    /** Import tasks from a picked or opened .json Uri. Emits a Snackbar message. */
+    fun import(uri: Uri) {
         viewModelScope.launch {
-            val n = syncRepo.importInbox(text)
-            val time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
-            val msg = when {
-                n < 0 -> "Import failed \u00b7 not valid JSON \u00b7 $time"
-                else -> "Loaded $n new task${if (n == 1) "" else "s"} from file \u00b7 $time"
+            val msg = try {
+                val n = importer.importFrom(uri)
+                when {
+                    n == 0 -> "Nothing new — already imported"
+                    else -> "Added $n task${if (n == 1) "" else "s"}"
+                }
+            } catch (e: Exception) {
+                "Couldn't read that file"
             }
-            syncSettings.setLastResult(msg)
+            _snackbar.emit(msg)
         }
     }
 }

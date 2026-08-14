@@ -1,5 +1,6 @@
 package com.thesouravverse.simplelife.ui
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -55,6 +57,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -70,7 +74,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -93,7 +96,9 @@ import java.util.Locale
 fun HomeScreen(
     vm: HomeViewModel = hiltViewModel(),
     triggerAdd: Boolean = false,
-    onAddConsumed: () -> Unit = {}
+    onAddConsumed: () -> Unit = {},
+    importUri: Uri? = null,
+    onImportConsumed: () -> Unit = {}
 ) {
     val day by vm.selectedDay.collectAsStateWithLifecycle()
     val tasks by vm.tasks.collectAsStateWithLifecycle()
@@ -103,6 +108,11 @@ fun HomeScreen(
     val isToday = day == today
     val isPast = day.isBefore(today)
     val isFuture = day.isAfter(today)
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { vm.import(it) } }
 
     var showAdd by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
@@ -115,6 +125,17 @@ fun HomeScreen(
     val parents = tasks.filter { it.parentId == null }
     val subsByParent = tasks.filter { it.parentId != null }.groupBy { it.parentId!! }
 
+    LaunchedEffect(Unit) {
+        vm.snackbar.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    LaunchedEffect(importUri) {
+        if (importUri != null) {
+            vm.import(importUri)
+            onImportConsumed()
+        }
+    }
+
     LaunchedEffect(triggerAdd) {
         if (triggerAdd) {
             if (!isToday) vm.selectDay(today)
@@ -124,6 +145,7 @@ fun HomeScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (!isPast) {
                 FloatingActionButton(
@@ -157,6 +179,7 @@ fun HomeScreen(
                 badgeExpanded = badgeExpanded,
                 onBadgeTap = { badgeExpanded = !badgeExpanded },
                 onDateTap = { showCalendar = true },
+                onImportTap = { importLauncher.launch(arrayOf("application/json")) },
                 onSettingsTap = { showSyncSettings = true },
                 onBackToToday = { vm.selectDay(today) }
             )
@@ -254,25 +277,12 @@ fun HomeScreen(
         val savedToken by vm.token.collectAsStateWithLifecycle()
         val savedRepo by vm.repoName.collectAsStateWithLifecycle()
         val lastResult by vm.lastResult.collectAsStateWithLifecycle()
-        val context = LocalContext.current
-        val jsonPicker = rememberLauncherForActivityResult(
-            ActivityResultContracts.OpenDocument()
-        ) { uri ->
-            uri?.let {
-                val text = runCatching {
-                    context.contentResolver.openInputStream(it)
-                        ?.bufferedReader()?.use { r -> r.readText() }
-                }.getOrNull()
-                if (text != null) vm.importJson(text)
-            }
-        }
         SyncSettingsDialog(
             initialToken = savedToken,
             initialRepo = savedRepo,
             lastResult = lastResult,
             onDismiss = { showSyncSettings = false },
             onSyncNow = { vm.syncNow() },
-            onLoadJson = { jsonPicker.launch(arrayOf("application/json", "text/*", "*/*")) },
             onSave = { token, repo ->
                 vm.saveSyncSettings(token, repo)
                 showSyncSettings = false
@@ -307,6 +317,7 @@ private fun TopBar(
     badgeExpanded: Boolean,
     onBadgeTap: () -> Unit,
     onDateTap: () -> Unit,
+    onImportTap: () -> Unit,
     onSettingsTap: () -> Unit,
     onBackToToday: () -> Unit
 ) {
@@ -371,6 +382,17 @@ private fun TopBar(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 6.dp)
+            )
+        }
+        IconButton(
+            onClick = onImportTap,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.FileUpload,
+                contentDescription = "Import tasks",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
             )
         }
         IconButton(
@@ -780,7 +802,6 @@ private fun SyncSettingsDialog(
     lastResult: String,
     onDismiss: () -> Unit,
     onSyncNow: () -> Unit,
-    onLoadJson: () -> Unit,
     onSave: (String, String) -> Unit
 ) {
     var token by remember(initialToken) { mutableStateOf(initialToken) }
@@ -822,19 +843,6 @@ private fun SyncSettingsDialog(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(12.dp))
-                TextButton(
-                    onClick = onLoadJson,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("Load a .json file")
-                }
                 if (lastResult.isNotBlank()) {
                     Spacer(Modifier.height(10.dp))
                     Text(
