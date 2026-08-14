@@ -1,11 +1,13 @@
 package com.thesouravverse.simplelife.ui
 
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.thesouravverse.simplelife.data.TaskRepository
 import com.thesouravverse.simplelife.data.db.TaskEntity
 import com.thesouravverse.simplelife.sync.SyncSettings
+import com.thesouravverse.simplelife.sync.TaskExporter
 import com.thesouravverse.simplelife.sync.TaskImporter
 import com.thesouravverse.simplelife.work.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +28,7 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val repo: TaskRepository,
     private val importer: TaskImporter,
+    private val exporter: TaskExporter,
     private val syncSettings: SyncSettings,
     private val workScheduler: WorkScheduler
 ) : ViewModel() {
@@ -52,6 +55,10 @@ class HomeViewModel @Inject constructor(
     /** One-shot messages for the home-screen Snackbar. */
     private val _snackbar = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbar: SharedFlow<String> = _snackbar
+
+    /** One-shot share-sheet intents for exporting. */
+    private val _shareIntent = MutableSharedFlow<Intent>(extraBufferCapacity = 1)
+    val shareIntent: SharedFlow<Intent> = _shareIntent
 
     init {
         // Apply -5 penalty for any past unchecked tasks every time the app opens.
@@ -103,6 +110,19 @@ class HomeViewModel @Inject constructor(
                 "Couldn't read that file"
             }
             _snackbar.emit(msg)
+        }
+    }
+
+    /** Build today's export, persist it to shared storage, and open the share sheet. */
+    fun exportTasks() {
+        viewModelScope.launch {
+            try {
+                runCatching { exporter.writeToSharedStorage() }
+                val file = exporter.writeToCache()
+                _shareIntent.emit(exporter.buildShareIntent(file))
+            } catch (e: Exception) {
+                _snackbar.emit("Couldn't export")
+            }
         }
     }
 }

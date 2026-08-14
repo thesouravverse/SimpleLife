@@ -1,6 +1,9 @@
 package com.thesouravverse.simplelife.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -38,6 +41,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
@@ -74,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -82,6 +87,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thesouravverse.simplelife.data.db.TaskEntity
@@ -110,9 +116,13 @@ fun HomeScreen(
     val isFuture = day.isAfter(today)
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { vm.import(it) } }
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* export still works if denied; we simply skip the notification */ }
 
     var showAdd by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
@@ -127,6 +137,19 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         vm.snackbar.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    LaunchedEffect(Unit) {
+        vm.shareIntent.collect { context.startActivity(it) }
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     LaunchedEffect(importUri) {
@@ -180,6 +203,7 @@ fun HomeScreen(
                 onBadgeTap = { badgeExpanded = !badgeExpanded },
                 onDateTap = { showCalendar = true },
                 onImportTap = { importLauncher.launch(arrayOf("application/json")) },
+                onExportTap = { vm.exportTasks() },
                 onSettingsTap = { showSyncSettings = true },
                 onBackToToday = { vm.selectDay(today) }
             )
@@ -318,6 +342,7 @@ private fun TopBar(
     onBadgeTap: () -> Unit,
     onDateTap: () -> Unit,
     onImportTap: () -> Unit,
+    onExportTap: () -> Unit,
     onSettingsTap: () -> Unit,
     onBackToToday: () -> Unit
 ) {
@@ -391,6 +416,17 @@ private fun TopBar(
             Icon(
                 Icons.Default.FileUpload,
                 contentDescription = "Import tasks",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        IconButton(
+            onClick = onExportTap,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.FileDownload,
+                contentDescription = "Export tasks",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )

@@ -41,6 +41,26 @@ class WorkScheduler @Inject constructor(
         )
     }
 
+    fun scheduleDailyExport() {
+        val now = LocalDateTime.now()
+        // Run at 23:55, before the 23:59/00:05 penalty job, so the export
+        // reflects the day as lived rather than after penalties are applied.
+        val nextRun = LocalDateTime.of(LocalDate.now(), LocalTime.of(23, 55))
+            .let { if (it.isBefore(now)) it.plusDays(1) else it }
+        val initialDelay = Duration.between(now, nextRun).toMillis()
+            .coerceAtLeast(0L)
+
+        val request = PeriodicWorkRequestBuilder<ExportWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .build()
+
+        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
+            EXPORT_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
     private val networkConstraints = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
@@ -69,6 +89,7 @@ class WorkScheduler @Inject constructor(
 
     companion object {
         private const val UNIQUE_NAME = "SimpleLife-daily-penalty"
+        private const val EXPORT_NAME = "SimpleLife-export"
         private const val SYNC_NAME = "SimpleLife-sync"
         private const val SYNC_NOW_NAME = "SimpleLife-sync-now"
     }

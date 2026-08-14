@@ -40,6 +40,8 @@ data class TaskStatus(
     val uid: String? = null,
     val text: String,
     val completed: Boolean,
+    val createdAt: String? = null,
+    val completedAt: String? = null,
     val penaltyCount: Int,
     val subtasks: List<TaskStatus> = emptyList()
 )
